@@ -5,9 +5,14 @@
 #include <ctype.h>
 #define MAX_WORD_LENGTH 100
 #define MAX_LINE_LENGTH 1000
+#define FILENAME "niv.txt"
+
+// you need to handle new lines the niv messes up when you give it an empty line only got \n
+// if you want, the user doesn't know
 
 // v1 is the first version, pretty much straight out of ChatGPT
 // v2 is a rework, with less chatGPT.
+// v3 tries to optimise it by copying less
 
 void makeLowerCase(char *str)
 {
@@ -15,7 +20,7 @@ void makeLowerCase(char *str)
 	
 	if (str[0] == '\0')
 	{
-		printf("making an empty string lowercase :/\n");
+		// apparently this is an edge case
 		return;
 	}
 
@@ -39,7 +44,6 @@ int hasGoodStartCharacter(char *str)
 	// apparently this is an edge case
 	if (str[0] == '\0')
 	{
-		printf("running hasGoodStartCharacter on an empty string :/\n");
 		return 0;
 	}
 	
@@ -56,7 +60,6 @@ void removeFromFront(char *str) // fine
 	// removes the first letter of a string by shifting the whole string down one
 	if(str[0] == '\0')
 	{
-		printf("hmm you gave an empty string to removeFromFront :/\n");
 		return;
 	}
 	
@@ -103,28 +106,20 @@ void makeWord(char *nextWord, char *editingSentence)
 	nextWord[letter_index] = '\0';
 }
 
-int checkIsInLine(const char *line_ref, const char *word_ref)
+int checkIsInLine(char *lowercase_line, const char *lowercase_word_ref)
 {
-	// this function is given a lowercase word and a sanitized lowercase line
+	// this function is given a lowercase word and a lowercase line
 	// and it checks the word is found in the line
 	
-	char pulled_word[MAX_WORD_LENGTH];	// the word pulled from the given line
+	char pulled_word[MAX_WORD_LENGTH];		// the word pulled from the given line
 	
-	char word[MAX_WORD_LENGTH];			// the editing copy of word_ref
-	strcpy(word, word_ref);
-	makeLowerCase(word);
-	
-	char line[MAX_LINE_LENGTH];			// the editing copy of line_ref
-	strcpy(line, line_ref);
-	makeLowerCase(line);
-	
-	while ((line[0] != '\n') && (line[0] != '\0'))
+	while ((lowercase_line[0] != '\n') && (lowercase_line[0] != '\0'))
 	{		
-		// transfer the next word in the line into line_word from line
-		makeWord(pulled_word, line);
+		// transfer the next word in the line into pulled_word from lowercase_line
+		makeWord(pulled_word, lowercase_line);
 
 		// check if we found it		
-		if (strcmp(pulled_word, word) == 0)
+		if (strcmp(pulled_word, lowercase_word_ref) == 0)
 		{
 			return 1;
 		}
@@ -132,47 +127,38 @@ int checkIsInLine(const char *line_ref, const char *word_ref)
 	return 0; // No whole word match found
 }
 
-void runSearch(const char *word, int *wordsInBible)
+void runSearch(const char *word, const char *lowercase_word, int *wordsInBible)
 {
 	// this is the main function that actually looks for the word in the whole Bible
-	// takes in a mixed case word and a counter variable
+	// takes in a mixed case word and a counter pointer
 	
 	// open the Bible
-	FILE *fid = fopen("kjv.txt", "r");
+	FILE *fid = fopen(FILENAME, "r");		// removed starting citations
     if (fid == NULL) {
         printf("Error opening file.\n");
         return;
     }
 	
 	// initialise variable to store a line
-	char line_ref[MAX_LINE_LENGTH];				// the line that gets read from the file
-    char line[MAX_LINE_LENGTH];					// the line we edit
+	char mixed_case_line[MAX_LINE_LENGTH];		// the line that gets read from the file
+    char lowercase_line[MAX_LINE_LENGTH];		// the line we edit
 	
 	// pull a line
-	int count = 0;
-    while ((fgets(line, sizeof(line), fid)) && (count < 40000))
+    while (fgets(mixed_case_line, sizeof(mixed_case_line), fid))
 	{
-		count++;
 		// make a reference of the line for display purposes
-		strcpy(line_ref, line);
+		strcpy(lowercase_line, mixed_case_line);
 		
-		// make the line lowercase
-		makeLowerCase(line);
-		
-		// the kjv.txt file I have has some references at the start like Ge1:1 to remove
-		while ((line[0] != ' ') && (line[0] != '\0') && (line[0] != '\n'))
-		{
-			removeFromFront(line);
-		}
-		removeBadStartCharacters(line);
+		// make the lowercase line lowercase
+		makeLowerCase(lowercase_line);
 		
 		// this is the bit that tries to find the word in the line
-		if (checkIsInLine(line, word) == 1)
+		if (checkIsInLine(lowercase_line, lowercase_word) == 1)
 		{
 			// found it
 			*wordsInBible=*wordsInBible+1;
 			printf("The word \"%s\" IS in the Bible!\n", word);
-			printf("%s\n", line_ref);
+			printf("%s\n", mixed_case_line);
 			fclose(fid);
 			return;
 		}
@@ -183,33 +169,30 @@ void runSearch(const char *word, int *wordsInBible)
 	printf("The word \"%s\" IS NOT in the Bible!\n\n", word);
 }
 
-// strcpy(editingSentence, inputSentence);
-// makeLowerCase(editingSentence);
-
 int main()
 {
 	int wordsInBible=0;
 	int wordsInSentence = 0;
 	char nextWord[MAX_WORD_LENGTH];
-	char editingSentence[MAX_LINE_LENGTH];
+	char lowercaseWord[MAX_WORD_LENGTH];
+	char sentence[MAX_LINE_LENGTH];
 	
 	// get the user input and put it into inputSentence
-	char inputSentence[MAX_LINE_LENGTH];
     printf("Enter a sentence: ");
-    fgets(inputSentence, sizeof(inputSentence), stdin);
+    fgets(sentence, sizeof(sentence), stdin);
 	printf("\n~~~\n\n");
 	
-	// make the editing copy
-	strcpy(editingSentence, inputSentence);
-	
 	// now run the search
-	while ((editingSentence[0] != '\n') && (editingSentence[0] != '\0'))
+	while ((sentence[0] != '\n') && (sentence[0] != '\0'))
 	{		
-		// transfer the word into nextWord from editing sentence
-		makeWord(nextWord, editingSentence);
+		// transfer the word into nextWord from the sentence
+		makeWord(nextWord, sentence);
+		
+		strcpy(lowercaseWord, nextWord);
+		makeLowerCase(lowercaseWord);
 		
 		// run the search of the word through the Bible
-		runSearch(nextWord, &wordsInBible);	// uppercase
+		runSearch(nextWord, lowercaseWord, &wordsInBible);
 		
 		// update the variables
 		wordsInSentence++;
@@ -223,7 +206,7 @@ int main()
 	}
 	else if (wordsInSentence != 0)
 	{
-		printf("Thus it turns out %.1f%% of those words are in the Bible", 100*(double)wordsInBible/wordsInSentence);
+		printf("Thus it turns out %.1f%% of those words are in the Bible\n", 100*(double)wordsInBible/wordsInSentence);
 	}
 
     return 0;
