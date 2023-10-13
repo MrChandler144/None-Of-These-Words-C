@@ -43,7 +43,7 @@ int isWholeWord(const char *longerString, const char *referenceWord)
 void searchInFile(const char *word, int *wordsInBible)
 {
     // open the file
-	FILE *fid = fopen("kjv.txt", "r");
+	FILE *fid = fopen("niv.txt", "r");
     if (fid == NULL) {
         printf("Error opening file.\n");
         return;
